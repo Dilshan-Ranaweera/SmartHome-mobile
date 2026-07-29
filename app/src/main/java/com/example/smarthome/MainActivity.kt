@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Analytics
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.ui.Modifier
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
@@ -24,6 +26,8 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.example.smarthome.navigation.DashboardRoute
 import com.example.smarthome.navigation.ReportsRoute
+import com.example.smarthome.navigation.SchedulesRoute
+import com.example.smarthome.navigation.CamerasRoute
 import com.example.smarthome.navigation.SmartHomeNavHost
 import com.example.smarthome.ui.theme.SmartHomeTheme
 
@@ -47,6 +51,34 @@ class MainActivity : ComponentActivity() {
                                 selected = currentDestination?.hierarchy?.any { it.hasRoute<DashboardRoute>() } == true,
                                 onClick = {
                                     navController.navigate(DashboardRoute) {
+                                        popUpTo(navController.graph.findStartDestination().id) {
+                                            saveState = true
+                                        }
+                                        launchSingleTop = true
+                                        restoreState = true
+                                    }
+                                }
+                            )
+                            NavigationBarItem(
+                                icon = { Icon(Icons.Default.Schedule, contentDescription = null) },
+                                label = { Text("Schedules") },
+                                selected = currentDestination?.hierarchy?.any { it.hasRoute<SchedulesRoute>() } == true,
+                                onClick = {
+                                    navController.navigate(SchedulesRoute) {
+                                        popUpTo(navController.graph.findStartDestination().id) {
+                                            saveState = true
+                                        }
+                                        launchSingleTop = true
+                                        restoreState = true
+                                    }
+                                }
+                            )
+                            NavigationBarItem(
+                                icon = { Icon(Icons.Default.Videocam, contentDescription = null) },
+                                label = { Text("Cameras") },
+                                selected = currentDestination?.hierarchy?.any { it.hasRoute<CamerasRoute>() } == true,
+                                onClick = {
+                                    navController.navigate(CamerasRoute) {
                                         popUpTo(navController.graph.findStartDestination().id) {
                                             saveState = true
                                         }

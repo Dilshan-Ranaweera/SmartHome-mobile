@@ -34,3 +34,17 @@ fun ReportsScreen() {
         Text(text = "Usage Reports & Analytics")
     }
 }
+
+@Composable
+fun SchedulesScreen() {
+    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Text(text = "Schedules & Safety Cutoffs")
+    }
+}
+
+@Composable
+fun CamerasScreen() {
+    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Text(text = "Security Camera Monitoring")
+    }
+}

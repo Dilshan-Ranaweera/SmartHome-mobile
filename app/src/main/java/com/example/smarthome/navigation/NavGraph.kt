@@ -11,6 +11,8 @@ import com.example.smarthome.ui.DashboardScreen
 import com.example.smarthome.ui.DeviceDetailScreen
 import com.example.smarthome.ui.FloorDetailScreen
 import com.example.smarthome.ui.ReportsScreen
+import com.example.smarthome.ui.SchedulesScreen
+import com.example.smarthome.ui.CamerasScreen
 
 @Serializable
 object DashboardRoute
@@ -23,6 +25,12 @@ data class DeviceDetailRoute(val deviceId: String)
 
 @Serializable
 object ReportsRoute
+
+@Serializable
+object SchedulesRoute
+
+@Serializable
+object CamerasRoute
 
 @Composable
 fun SmartHomeNavHost(navController: NavHostController) {
@@ -43,6 +51,12 @@ fun SmartHomeNavHost(navController: NavHostController) {
         }
         composable<ReportsRoute> {
             ReportsScreen()
+        }
+        composable<SchedulesRoute> {
+            SchedulesScreen()
+        }
+        composable<CamerasRoute> {
+            CamerasScreen()
         }
     }
 }
