@@ -45,11 +45,23 @@ fun SmartHomeNavHost(
         startDestination = DashboardRoute
     ) {
         composable<DashboardRoute> {
-            DashboardScreen(homeViewModel)
+            DashboardScreen(
+                viewModel = homeViewModel,
+                onFloorClick = { floorId ->
+                    navController.navigate(FloorDetailRoute(floorId))
+                }
+            )
         }
         composable<FloorDetailRoute> { backStackEntry ->
             val route: FloorDetailRoute = backStackEntry.toRoute()
-            FloorDetailScreen(route.floorId, homeViewModel)
+            FloorDetailScreen(
+                floorId = route.floorId,
+                viewModel = homeViewModel,
+                onBack = { navController.popBackStack() },
+                onDeviceClick = { deviceId ->
+                    navController.navigate(DeviceDetailRoute(deviceId))
+                }
+            )
         }
         composable<DeviceDetailRoute> { backStackEntry ->
             val route: DeviceDetailRoute = backStackEntry.toRoute()
