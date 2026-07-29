@@ -14,6 +14,9 @@ import com.example.smarthome.ui.ReportsScreen
 import com.example.smarthome.ui.SchedulesScreen
 import com.example.smarthome.ui.CamerasScreen
 
+import com.example.smarthome.viewmodel.HomeViewModel
+import androidx.lifecycle.viewmodel.compose.viewModel
+
 @Serializable
 object DashboardRoute
 
@@ -33,30 +36,33 @@ object SchedulesRoute
 object CamerasRoute
 
 @Composable
-fun SmartHomeNavHost(navController: NavHostController) {
+fun SmartHomeNavHost(
+    navController: NavHostController,
+    homeViewModel: HomeViewModel = viewModel()
+) {
     NavHost(
         navController = navController,
         startDestination = DashboardRoute
     ) {
         composable<DashboardRoute> {
-            DashboardScreen()
+            DashboardScreen(homeViewModel)
         }
         composable<FloorDetailRoute> { backStackEntry ->
             val route: FloorDetailRoute = backStackEntry.toRoute()
-            FloorDetailScreen(route.floorId)
+            FloorDetailScreen(route.floorId, homeViewModel)
         }
         composable<DeviceDetailRoute> { backStackEntry ->
             val route: DeviceDetailRoute = backStackEntry.toRoute()
-            DeviceDetailScreen(route.deviceId)
+            DeviceDetailScreen(route.deviceId, homeViewModel)
         }
         composable<ReportsRoute> {
-            ReportsScreen()
+            ReportsScreen(homeViewModel)
         }
         composable<SchedulesRoute> {
-            SchedulesScreen()
+            SchedulesScreen(homeViewModel)
         }
         composable<CamerasRoute> {
-            CamerasScreen()
+            CamerasScreen(homeViewModel)
         }
     }
 }
