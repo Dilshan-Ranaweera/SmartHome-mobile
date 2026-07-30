@@ -78,4 +78,23 @@ class MockHomeRepository : HomeRepository {
             )
         }
     }
+
+    override suspend fun addRoom(floorId: String, name: String, x: Int, y: Int) {
+        _floorPlans.update { currentFloors ->
+            currentFloors.map { floor ->
+                if (floor.id == floorId) {
+                    val newRoom = Room(
+                        id = UUID.randomUUID().toString(),
+                        name = name,
+                        devices = emptyList(),
+                        x = x,
+                        y = y,
+                        width = 1,
+                        height = 1
+                    )
+                    floor.copy(rooms = floor.rooms + newRoom)
+                } else floor
+            }
+        }
+    }
 }

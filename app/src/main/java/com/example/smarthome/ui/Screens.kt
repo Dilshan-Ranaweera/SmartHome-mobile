@@ -3,9 +3,6 @@ package com.example.smarthome.ui
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -147,6 +144,10 @@ fun FloorDetailScreen(
 ) {
     val floors by viewModel.floorPlans.collectAsState()
     val floor = floors.find { it.id == floorId }
+    
+    var showAddRoomDialog by remember { mutableStateOf(false) }
+    var selectedX by remember { mutableIntStateOf(0) }
+    var selectedY by remember { mutableIntStateOf(0) }
 
     if (floor == null) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -172,6 +173,7 @@ fun FloorDetailScreen(
         ) {
             item {
                 Text(text = "Rooms", style = MaterialTheme.typography.titleMedium)
+                Text(text = "Tap an empty space to add a room", style = MaterialTheme.typography.bodySmall)
                 Spacer(modifier = Modifier.height(8.dp))
                 // Abstract grid representation of rooms
                 BoxWithConstraints(modifier = Modifier.fillMaxWidth().height(200.dp)) {
@@ -190,6 +192,28 @@ fun FloorDetailScreen(
                                 color = MaterialTheme.colorScheme.outlineVariant,
                                 shape = androidx.compose.foundation.shape.CircleShape
                             ) {}
+                        }
+                    }
+
+                    // Clickable area for adding rooms
+                    for (i in 0 until gridSize) {
+                        for (j in 0 until gridSize) {
+                            val isOccupied = floor.rooms.any { room ->
+                                i >= room.x && i < room.x + room.width &&
+                                j >= room.y && j < room.y + room.height
+                            }
+                            if (!isOccupied) {
+                                Box(
+                                    modifier = Modifier
+                                        .offset(x = cellWidth * i, y = cellHeight * j)
+                                        .size(width = cellWidth, height = cellHeight)
+                                        .clickable {
+                                            selectedX = i
+                                            selectedY = j
+                                            showAddRoomDialog = true
+                                        }
+                                )
+                            }
                         }
                     }
 
@@ -235,6 +259,15 @@ fun FloorDetailScreen(
                         modifier = Modifier.padding(top = 8.dp)
                     )
                 }
+                if (room.devices.isEmpty()) {
+                    item {
+                        Text(
+                            text = "No devices in this room",
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.padding(start = 8.dp, bottom = 4.dp)
+                        )
+                    }
+                }
                 items(room.devices) { device ->
                     DeviceItem(
                         device = device,
@@ -245,6 +278,51 @@ fun FloorDetailScreen(
             }
         }
     }
+
+    if (showAddRoomDialog) {
+        AddRoomDialog(
+            x = selectedX,
+            y = selectedY,
+            onDismiss = { showAddRoomDialog = false },
+            onConfirm = { name ->
+                viewModel.addRoom(floor.id, name, selectedX, selectedY)
+                showAddRoomDialog = false
+            }
+        )
+    }
+}
+
+@Composable
+fun AddRoomDialog(x: Int, y: Int, onDismiss: () -> Unit, onConfirm: (String) -> Unit) {
+    var roomName by remember { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Add Room at ($x, $y)") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Enter a name for the new room.")
+                OutlinedTextField(
+                    value = roomName,
+                    onValueChange = { roomName = it },
+                    label = { Text("Room Name") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { onConfirm(roomName) },
+                enabled = roomName.isNotBlank()
+            ) {
+                Text("Add")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

@@ -11,9 +11,12 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
+import kotlinx.coroutines.flow.map
+
 class HomeViewModel(private val repository: HomeRepository = MockHomeRepository()) : ViewModel() {
 
     val floorPlans: StateFlow<List<FloorPlan>> = repository.getFloorPlans()
+        .map { floors -> floors.sortedByDescending { it.level } }
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
@@ -36,6 +39,12 @@ class HomeViewModel(private val repository: HomeRepository = MockHomeRepository(
     fun addFloor(name: String, level: Int) {
         viewModelScope.launch {
             repository.addFloor(name, level)
+        }
+    }
+
+    fun addRoom(floorId: String, name: String, x: Int, y: Int) {
+        viewModelScope.launch {
+            repository.addRoom(floorId, name, x, y)
         }
     }
 }

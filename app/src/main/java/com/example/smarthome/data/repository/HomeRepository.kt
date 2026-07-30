@@ -9,4 +9,5 @@ interface HomeRepository {
     fun getDevices(): Flow<List<Device>>
     suspend fun toggleDevice(deviceId: String, isOn: Boolean)
     suspend fun addFloor(name: String, level: Int)
+    suspend fun addRoom(floorId: String, name: String, x: Int, y: Int)
 }
