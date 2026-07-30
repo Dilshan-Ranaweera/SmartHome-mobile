@@ -17,6 +17,13 @@ import com.example.smarthome.domain.Device
 import com.example.smarthome.domain.DeviceStatus
 import com.example.smarthome.domain.FloorPlan
 import com.example.smarthome.viewmodel.HomeViewModel
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
+import kotlin.math.max
+import kotlin.math.min
+import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -148,6 +155,12 @@ fun FloorDetailScreen(
     var showAddRoomDialog by remember { mutableStateOf(false) }
     var selectedX by remember { mutableIntStateOf(0) }
     var selectedY by remember { mutableIntStateOf(0) }
+    var selectedWidth by remember { mutableIntStateOf(1) }
+    var selectedHeight by remember { mutableIntStateOf(1) }
+
+    // Drag state
+    var dragStartOffset by remember { mutableStateOf<Offset?>(null) }
+    var dragEndOffset by remember { mutableStateOf<Offset?>(null) }
 
     if (floor == null) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -172,11 +185,74 @@ fun FloorDetailScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             item {
-                Text(text = "Rooms", style = MaterialTheme.typography.titleMedium)
-                Text(text = "Tap an empty space to add a room", style = MaterialTheme.typography.bodySmall)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text(text = "Rooms", style = MaterialTheme.typography.titleMedium)
+                        Text(text = "Drag across dots to draw a room", style = MaterialTheme.typography.bodySmall)
+                    }
+                }
                 Spacer(modifier = Modifier.height(8.dp))
+                
                 // Abstract grid representation of rooms
-                BoxWithConstraints(modifier = Modifier.fillMaxWidth().height(200.dp)) {
+                BoxWithConstraints(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(250.dp)
+                        .pointerInput(Unit) {
+                            detectDragGestures(
+                                onDragStart = { offset ->
+                                    dragStartOffset = offset
+                                    dragEndOffset = offset
+                                },
+                                onDrag = { change, _ ->
+                                    dragEndOffset = change.position
+                                },
+                                onDragEnd = {
+                                    val start = dragStartOffset
+                                    val end = dragEndOffset
+                                    if (start != null && end != null) {
+                                        val gridSize = 4
+                                        val cellWidth = size.width / gridSize
+                                        val cellHeight = size.height / gridSize
+
+                                        val x1 = (start.x / cellWidth).toInt().coerceIn(0, gridSize - 1)
+                                        val y1 = (start.y / cellHeight).toInt().coerceIn(0, gridSize - 1)
+                                        val x2 = (end.x / cellWidth).toInt().coerceIn(0, gridSize - 1)
+                                        val y2 = (end.y / cellHeight).toInt().coerceIn(0, gridSize - 1)
+
+                                        val gx = min(x1, x2)
+                                        val gy = min(y1, y2)
+                                        val gw = (max(x1, x2) - gx + 1)
+                                        val gh = (max(y1, y2) - gy + 1)
+
+                                        // Check for overlap
+                                        val hasOverlap = floor.rooms.any { room ->
+                                            gx < room.x + room.width && gx + gw > room.x &&
+                                            gy < room.y + room.height && gy + gh > room.y
+                                        }
+
+                                        if (!hasOverlap) {
+                                            selectedX = gx
+                                            selectedY = gy
+                                            selectedWidth = gw
+                                            selectedHeight = gh
+                                            showAddRoomDialog = true
+                                        }
+                                    }
+                                    dragStartOffset = null
+                                    dragEndOffset = null
+                                },
+                                onDragCancel = {
+                                    dragStartOffset = null
+                                    dragEndOffset = null
+                                }
+                            )
+                        }
+                ) {
                     val gridSize = 4
                     val cellWidth = maxWidth / gridSize
                     val cellHeight = maxHeight / gridSize
@@ -186,34 +262,11 @@ fun FloorDetailScreen(
                         for (j in 0 until gridSize) {
                             Surface(
                                 modifier = Modifier
-                                    .offset(x = cellWidth * i, y = cellHeight * j)
-                                    .size(4.dp)
-                                    .align(Alignment.TopStart),
+                                    .offset(x = cellWidth * i + (cellWidth / 2) - 2.dp, y = cellHeight * j + (cellHeight / 2) - 2.dp)
+                                    .size(4.dp),
                                 color = MaterialTheme.colorScheme.outlineVariant,
                                 shape = androidx.compose.foundation.shape.CircleShape
                             ) {}
-                        }
-                    }
-
-                    // Clickable area for adding rooms
-                    for (i in 0 until gridSize) {
-                        for (j in 0 until gridSize) {
-                            val isOccupied = floor.rooms.any { room ->
-                                i >= room.x && i < room.x + room.width &&
-                                j >= room.y && j < room.y + room.height
-                            }
-                            if (!isOccupied) {
-                                Box(
-                                    modifier = Modifier
-                                        .offset(x = cellWidth * i, y = cellHeight * j)
-                                        .size(width = cellWidth, height = cellHeight)
-                                        .clickable {
-                                            selectedX = i
-                                            selectedY = j
-                                            showAddRoomDialog = true
-                                        }
-                                )
-                            }
                         }
                     }
 
@@ -238,6 +291,40 @@ fun FloorDetailScreen(
                                 }
                             }
                         }
+                    }
+
+                    // Draw the "Ghost" selection box during drag
+                    if (dragStartOffset != null && dragEndOffset != null) {
+                        val start = dragStartOffset!!
+                        val end = dragEndOffset!!
+                        
+                        val x1 = (start.x / (constraints.maxWidth / gridSize)).toInt().coerceIn(0, gridSize - 1)
+                        val y1 = (start.y / (constraints.maxHeight / gridSize)).toInt().coerceIn(0, gridSize - 1)
+                        val x2 = (end.x / (constraints.maxWidth / gridSize)).toInt().coerceIn(0, gridSize - 1)
+                        val y2 = (end.y / (constraints.maxHeight / gridSize)).toInt().coerceIn(0, gridSize - 1)
+
+                        val gx = min(x1, x2)
+                        val gy = min(y1, y2)
+                        val gw = (max(x1, x2) - gx + 1)
+                        val gh = (max(y1, y2) - gy + 1)
+
+                        // Check for overlap
+                        val hasOverlap = floor.rooms.any { room ->
+                            gx < room.x + room.width && gx + gw > room.x &&
+                            gy < room.y + room.height && gy + gh > room.y
+                        }
+                        
+                        val boxColor = if (hasOverlap) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+
+                        Surface(
+                            modifier = Modifier
+                                .offset(x = cellWidth * gx, y = cellHeight * gy)
+                                .size(width = cellWidth * gw, height = cellHeight * gh)
+                                .padding(2.dp),
+                            color = boxColor.copy(alpha = 0.3f),
+                            shape = MaterialTheme.shapes.medium,
+                            border = androidx.compose.foundation.BorderStroke(2.dp, boxColor)
+                        ) {}
                     }
                 }
             }
@@ -283,9 +370,11 @@ fun FloorDetailScreen(
         AddRoomDialog(
             x = selectedX,
             y = selectedY,
+            width = selectedWidth,
+            height = selectedHeight,
             onDismiss = { showAddRoomDialog = false },
             onConfirm = { name ->
-                viewModel.addRoom(floor.id, name, selectedX, selectedY)
+                viewModel.addRoom(floor.id, name, selectedX, selectedY, selectedWidth, selectedHeight)
                 showAddRoomDialog = false
             }
         )
@@ -293,11 +382,16 @@ fun FloorDetailScreen(
 }
 
 @Composable
-fun AddRoomDialog(x: Int, y: Int, onDismiss: () -> Unit, onConfirm: (String) -> Unit) {
+fun AddRoomDialog(
+    x: Int, y: Int, 
+    width: Int, height: Int, 
+    onDismiss: () -> Unit, 
+    onConfirm: (String) -> Unit
+) {
     var roomName by remember { mutableStateOf("") }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Add Room at ($x, $y)") },
+        title = { Text("Add Room: ${width}x${height} at ($x, $y)") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("Enter a name for the new room.")

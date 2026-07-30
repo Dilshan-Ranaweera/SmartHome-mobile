@@ -42,9 +42,9 @@ class HomeViewModel(private val repository: HomeRepository = MockHomeRepository(
         }
     }
 
-    fun addRoom(floorId: String, name: String, x: Int, y: Int) {
+    fun addRoom(floorId: String, name: String, x: Int, y: Int, width: Int, height: Int) {
         viewModelScope.launch {
-            repository.addRoom(floorId, name, x, y)
+            repository.addRoom(floorId, name, x, y, width, height)
         }
     }
 }

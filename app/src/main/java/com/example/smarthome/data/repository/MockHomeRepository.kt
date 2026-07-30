@@ -79,7 +79,7 @@ class MockHomeRepository : HomeRepository {
         }
     }
 
-    override suspend fun addRoom(floorId: String, name: String, x: Int, y: Int) {
+    override suspend fun addRoom(floorId: String, name: String, x: Int, y: Int, width: Int, height: Int) {
         _floorPlans.update { currentFloors ->
             currentFloors.map { floor ->
                 if (floor.id == floorId) {
@@ -89,8 +89,8 @@ class MockHomeRepository : HomeRepository {
                         devices = emptyList(),
                         x = x,
                         y = y,
-                        width = 1,
-                        height = 1
+                        width = width,
+                        height = height
                     )
                     floor.copy(rooms = floor.rooms + newRoom)
                 } else floor
