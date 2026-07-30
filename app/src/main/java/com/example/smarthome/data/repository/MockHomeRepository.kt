@@ -7,34 +7,40 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 
+import java.util.UUID
+
 class MockHomeRepository : HomeRepository {
-    private val _floorPlans = MutableStateFlow(listOf(
-        FloorPlan(
-            id = "f1",
-            name = "Ground Floor",
-            rooms = listOf(
-                Room("r1", "Living Room", listOf(
-                    Device.Outlet("d1", "Main AC Outlet", DeviceStatus.ON),
-                    Device.SecurityCamera("c1", "Front Door", DeviceStatus.ON, "mock://stream/front_door")
-                )),
-                Room("r2", "Kitchen", listOf(
-                    Device.MultiSwitch("d2", "Kitchen Lights", DeviceStatus.OFF, listOf(
-                        SwitchUnit("s1", "Main Light", false),
-                        SwitchUnit("s2", "Counter Light", false)
-                    ))
-                ))
+    companion object {
+        private val _floorPlans = MutableStateFlow(listOf(
+            FloorPlan(
+                id = "f1",
+                name = "Ground Floor",
+                level = 0,
+                rooms = listOf(
+                    Room("r1", "Living Room", listOf(
+                        Device.Outlet("d1", "Main AC Outlet", DeviceStatus.ON),
+                        Device.SecurityCamera("c1", "Front Door", DeviceStatus.ON, "mock://stream/front_door")
+                    ), x = 0, y = 0, width = 2, height = 2),
+                    Room("r2", "Kitchen", listOf(
+                        Device.MultiSwitch("d2", "Kitchen Lights", DeviceStatus.OFF, listOf(
+                            SwitchUnit("s1", "Main Light", false),
+                            SwitchUnit("s2", "Counter Light", false)
+                        ))
+                    ), x = 2, y = 0, width = 2, height = 2)
+                )
+            ),
+            FloorPlan(
+                id = "f2",
+                name = "First Floor",
+                level = 1,
+                rooms = listOf(
+                    Room("r3", "Bedroom", listOf(
+                        Device.SafetyDevice("d3", "Clothing Iron", DeviceStatus.OFF, maxOnDurationMinutes = 15)
+                    ), x = 0, y = 0, width = 2, height = 2)
+                )
             )
-        ),
-        FloorPlan(
-            id = "f2",
-            name = "First Floor",
-            rooms = listOf(
-                Room("r3", "Bedroom", listOf(
-                    Device.SafetyDevice("d3", "Clothing Iron", DeviceStatus.OFF, maxOnDurationMinutes = 15)
-                ))
-            )
-        )
-    ))
+        ))
+    }
 
     override fun getFloorPlans(): Flow<List<FloorPlan>> = _floorPlans.asStateFlow()
 
@@ -59,6 +65,17 @@ class MockHomeRepository : HomeRepository {
                     })
                 })
             }
+        }
+    }
+
+    override suspend fun addFloor(name: String, level: Int) {
+        _floorPlans.update { currentFloors ->
+            currentFloors + FloorPlan(
+                id = UUID.randomUUID().toString(),
+                name = name,
+                level = level,
+                rooms = emptyList()
+            )
         }
     }
 }

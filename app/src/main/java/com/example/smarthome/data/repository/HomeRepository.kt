@@ -8,4 +8,5 @@ interface HomeRepository {
     fun getFloorPlans(): Flow<List<FloorPlan>>
     fun getDevices(): Flow<List<Device>>
     suspend fun toggleDevice(deviceId: String, isOn: Boolean)
+    suspend fun addFloor(name: String, level: Int)
 }

@@ -32,4 +32,10 @@ class HomeViewModel(private val repository: HomeRepository = MockHomeRepository(
             repository.toggleDevice(deviceId, isOn)
         }
     }
+
+    fun addFloor(name: String, level: Int) {
+        viewModelScope.launch {
+            repository.addFloor(name, level)
+        }
+    }
 }

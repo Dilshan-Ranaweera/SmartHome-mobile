@@ -10,6 +10,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -20,17 +21,87 @@ import com.example.smarthome.domain.DeviceStatus
 import com.example.smarthome.domain.FloorPlan
 import com.example.smarthome.viewmodel.HomeViewModel
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DashboardScreen(viewModel: HomeViewModel, onFloorClick: (String) -> Unit) {
     val floors by viewModel.floorPlans.collectAsState()
+    var showAddFloorSheet by remember { mutableStateOf(false) }
 
-    Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-        Text(text = "My Smart Home", style = MaterialTheme.typography.headlineMedium)
-        Spacer(modifier = Modifier.height(16.dp))
-        
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            items(floors) { floor ->
-                FloorSummaryCard(floor = floor, onClick = { onFloorClick(floor.id) })
+    Scaffold(
+        floatingActionButton = {
+            FloatingActionButton(onClick = { showAddFloorSheet = true }) {
+                Icon(Icons.Default.Add, contentDescription = "Add Floor")
+            }
+        }
+    ) { paddingValues ->
+        Column(modifier = Modifier.fillMaxSize().padding(paddingValues).padding(16.dp)) {
+            Text(text = "My Smart Home", style = MaterialTheme.typography.headlineMedium)
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                items(floors) { floor ->
+                    FloorSummaryCard(floor = floor, onClick = { onFloorClick(floor.id) })
+                }
+            }
+        }
+    }
+
+    if (showAddFloorSheet) {
+        AddFloorBottomSheet(
+            onDismiss = { showAddFloorSheet = false },
+            onConfirm = { name, level ->
+                viewModel.addFloor(name, level)
+                showAddFloorSheet = false
+            }
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun AddFloorBottomSheet(onDismiss: () -> Unit, onConfirm: (String, Int) -> Unit) {
+    var floorName by remember { mutableStateOf("") }
+    var level by remember { mutableIntStateOf(0) }
+    val sheetState = rememberModalBottomSheetState()
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+                .padding(bottom = 32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Text("Add New Floor", style = MaterialTheme.typography.headlineSmall)
+            
+            OutlinedTextField(
+                value = floorName,
+                onValueChange = { floorName = it },
+                label = { Text("Floor Name") },
+                modifier = Modifier.fillMaxWidth(),
+                placeholder = { Text("e.g. Attic, Basement") }
+            )
+
+            Column(horizontalAlignment = Alignment.Start, modifier = Modifier.fillMaxWidth()) {
+                Text("Floor Level: $level", style = MaterialTheme.typography.bodyLarge)
+                Slider(
+                    value = level.toFloat(),
+                    onValueChange = { level = it.toInt() },
+                    valueRange = -2f..5f,
+                    steps = 6
+                )
+            }
+
+            Button(
+                onClick = { if (floorName.isNotBlank()) onConfirm(floorName, level) },
+                modifier = Modifier.fillMaxWidth(),
+                enabled = floorName.isNotBlank()
+            ) {
+                Text("Create Floor")
             }
         }
     }
@@ -103,14 +174,46 @@ fun FloorDetailScreen(
                 Text(text = "Rooms", style = MaterialTheme.typography.titleMedium)
                 Spacer(modifier = Modifier.height(8.dp))
                 // Abstract grid representation of rooms
-                LazyVerticalGrid(
-                    columns = GridCells.Fixed(2),
-                    modifier = Modifier.heightIn(max = 400.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    items(floor.rooms) { room ->
-                        RoomCard(room.name, room.devices.size) { }
+                BoxWithConstraints(modifier = Modifier.fillMaxWidth().height(200.dp)) {
+                    val gridSize = 4
+                    val cellWidth = maxWidth / gridSize
+                    val cellHeight = maxHeight / gridSize
+
+                    // Draw the empty grid dots
+                    for (i in 0 until gridSize) {
+                        for (j in 0 until gridSize) {
+                            Surface(
+                                modifier = Modifier
+                                    .offset(x = cellWidth * i, y = cellHeight * j)
+                                    .size(4.dp)
+                                    .align(Alignment.TopStart),
+                                color = MaterialTheme.colorScheme.outlineVariant,
+                                shape = androidx.compose.foundation.shape.CircleShape
+                            ) {}
+                        }
+                    }
+
+                    // Draw the rooms as blocks
+                    floor.rooms.forEach { room ->
+                        Card(
+                            modifier = Modifier
+                                .offset(x = cellWidth * room.x, y = cellHeight * room.y)
+                                .size(width = cellWidth * room.width, height = cellHeight * room.height)
+                                .padding(2.dp),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                        ) {
+                            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Icon(Icons.Default.MeetingRoom, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Text(
+                                        text = room.name,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        maxLines = 1
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             }

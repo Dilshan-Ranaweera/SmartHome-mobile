@@ -57,12 +57,17 @@ data class SwitchUnit(
 data class Room(
     val id: String,
     val name: String,
-    val devices: List<Device>
+    val devices: List<Device>,
+    val x: Int = 0,
+    val y: Int = 0,
+    val width: Int = 1,
+    val height: Int = 1
 )
 
 @Serializable
 data class FloorPlan(
     val id: String,
     val name: String,
+    val level: Int = 0,
     val rooms: List<Room>
 )
