@@ -435,17 +435,42 @@ fun AddDeviceBottomSheet(onDismiss: () -> Unit, onConfirm: (Device) -> Unit) {
     var deviceName by remember { mutableStateOf("") }
     var switchCount by remember { mutableIntStateOf(2) }
     var maxDuration by remember { mutableIntStateOf(15) }
+    var startTime by remember { mutableStateOf("18:00") }
+    var endTime by remember { mutableStateOf("06:00") }
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(modifier = Modifier.fillMaxWidth().padding(16.dp).padding(bottom = 32.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Text("Add New Device", style = MaterialTheme.typography.headlineSmall)
             OutlinedTextField(value = deviceName, onValueChange = { deviceName = it }, label = { Text("Device Name") }, modifier = Modifier.fillMaxWidth())
             Text("Device Type", style = MaterialTheme.typography.titleMedium)
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                listOf("Outlet", "Multi-Switch", "Safety Iron", "Camera").forEach { type ->
-                    FilterChip(selected = deviceType == type, onClick = { deviceType = type }, label = { Text(type) })
+            
+            val types = listOf("Outlet", "Multi-Switch", "Safety Iron", "Light", "Camera")
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                // First Row
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    types.take(3).forEach { type ->
+                        FilterChip(
+                            selected = deviceType == type,
+                            onClick = { deviceType = type },
+                            label = { Text(type) },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+                // Second Row
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    types.drop(3).forEach { type ->
+                        FilterChip(
+                            selected = deviceType == type,
+                            onClick = { deviceType = type },
+                            label = { Text(type) },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                    Spacer(modifier = Modifier.weight(1f)) // Placeholder to keep layout consistent
                 }
             }
+
             when (deviceType) {
                 "Multi-Switch" -> Column {
                     Text("Number of Switches: $switchCount")
@@ -459,6 +484,13 @@ fun AddDeviceBottomSheet(onDismiss: () -> Unit, onConfirm: (Device) -> Unit) {
                     Text("Max Duration: $maxDuration minutes")
                     Slider(value = maxDuration.toFloat(), onValueChange = { maxDuration = it.toInt() }, valueRange = 5f..60f, steps = 11)
                 }
+                "Light" -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Automation Schedule")
+                    Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                        OutlinedTextField(value = startTime, onValueChange = { startTime = it }, label = { Text("Start Time") }, modifier = Modifier.weight(1f))
+                        OutlinedTextField(value = endTime, onValueChange = { endTime = it }, label = { Text("End Time") }, modifier = Modifier.weight(1f))
+                    }
+                }
             }
             Button(
                 onClick = {
@@ -467,6 +499,7 @@ fun AddDeviceBottomSheet(onDismiss: () -> Unit, onConfirm: (Device) -> Unit) {
                         "Outlet" -> Device.Outlet(id, deviceName)
                         "Multi-Switch" -> Device.MultiSwitch(id, deviceName, switches = List(switchCount) { i -> com.example.smarthome.domain.SwitchUnit("s$i", "Switch ${i + 1}", false) })
                         "Safety Iron" -> Device.SafetyDevice(id, deviceName, maxOnDurationMinutes = maxDuration)
+                        "Light" -> Device.Light(id, deviceName, scheduleStart = startTime, scheduleEnd = endTime)
                         "Camera" -> Device.SecurityCamera(id, deviceName, streamUri = "mock://stream/$deviceName")
                         else -> Device.Outlet(id, deviceName)
                     }
@@ -512,12 +545,13 @@ fun DeviceItem(device: Device, onToggle: (Boolean) -> Unit, onMultiToggle: (Stri
                 headlineContent = { Text(device.name) }, supportingContent = { Text(device.status.name) },
                 leadingContent = {
                     val icon = when (device) {
-                        is Device.Outlet -> Icons.Default.Power
-                        is Device.MultiSwitch -> Icons.Default.SettingsInputComponent
-                        is Device.SafetyDevice -> Icons.Default.Warning
+                        is Device.Outlet -> Icons.Default.Outlet
+                        is Device.MultiSwitch -> Icons.Default.Hub
+                        is Device.SafetyDevice -> Icons.Default.Iron
                         is Device.SecurityCamera -> Icons.Default.Videocam
+                        is Device.Light -> Icons.Default.Lightbulb
                     }
-                    Icon(icon, contentDescription = null)
+                    Icon(icon, contentDescription = null, tint = if (device.status == DeviceStatus.ON) MaterialTheme.colorScheme.primary else LocalContentColor.current)
                 },
                 trailingContent = {
                     if (device !is Device.SecurityCamera && device !is Device.MultiSwitch) {

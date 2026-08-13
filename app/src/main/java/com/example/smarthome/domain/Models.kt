@@ -44,6 +44,15 @@ sealed class Device {
         override val status: DeviceStatus = DeviceStatus.DISCONNECTED,
         val streamUri: String? = null
     ) : Device()
+
+    @Serializable
+    data class Light(
+        override val id: String,
+        override val name: String,
+        override val status: DeviceStatus = DeviceStatus.OFF,
+        val scheduleStart: String? = null,
+        val scheduleEnd: String? = null
+    ) : Device()
 }
 
 @Serializable

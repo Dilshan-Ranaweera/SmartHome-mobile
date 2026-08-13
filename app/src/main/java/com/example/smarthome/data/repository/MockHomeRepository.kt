@@ -58,12 +58,13 @@ class MockHomeRepository : HomeRepository {
                             when (device) {
                                 is Device.Outlet -> device.copy(status = newStatus)
                                 is Device.MultiSwitch -> {
-                                    // If toggling the whole unit, maybe toggle all switches? 
+                                    // If toggling the whole unit, maybe toggle all switches?
                                     // Or just update status. Let's update status and all switches for consistency.
                                     device.copy(status = newStatus, switches = device.switches.map { it.copy(isOn = isOn) })
                                 }
                                 is Device.SafetyDevice -> device.copy(status = newStatus)
                                 is Device.SecurityCamera -> device.copy(status = newStatus)
+                                is Device.Light -> device.copy(status = newStatus)
                             }
                         } else device
                     })
