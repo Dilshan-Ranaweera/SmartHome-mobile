@@ -57,10 +57,35 @@ class MockHomeRepository : HomeRepository {
                             val newStatus = if (isOn) DeviceStatus.ON else DeviceStatus.OFF
                             when (device) {
                                 is Device.Outlet -> device.copy(status = newStatus)
-                                is Device.MultiSwitch -> device.copy(status = newStatus)
+                                is Device.MultiSwitch -> {
+                                    // If toggling the whole unit, maybe toggle all switches? 
+                                    // Or just update status. Let's update status and all switches for consistency.
+                                    device.copy(status = newStatus, switches = device.switches.map { it.copy(isOn = isOn) })
+                                }
                                 is Device.SafetyDevice -> device.copy(status = newStatus)
                                 is Device.SecurityCamera -> device.copy(status = newStatus)
                             }
+                        } else device
+                    })
+                })
+            }
+        }
+    }
+
+    override suspend fun toggleMultiSwitch(deviceId: String, switchId: String, isOn: Boolean) {
+        _floorPlans.update { floors ->
+            floors.map { floor ->
+                floor.copy(rooms = floor.rooms.map { room ->
+                    room.copy(devices = room.devices.map { device ->
+                        if (device.id == deviceId && device is Device.MultiSwitch) {
+                            val updatedSwitches = device.switches.map { 
+                                if (it.id == switchId) it.copy(isOn = isOn) else it
+                            }
+                            val anyOn = updatedSwitches.any { it.isOn }
+                            device.copy(
+                                switches = updatedSwitches,
+                                status = if (anyOn) DeviceStatus.ON else DeviceStatus.OFF
+                            )
                         } else device
                     })
                 })
@@ -94,6 +119,18 @@ class MockHomeRepository : HomeRepository {
                     )
                     floor.copy(rooms = floor.rooms + newRoom)
                 } else floor
+            }
+        }
+    }
+
+    override suspend fun addDeviceToRoom(roomId: String, device: Device) {
+        _floorPlans.update { floors ->
+            floors.map { floor ->
+                floor.copy(rooms = floor.rooms.map { room ->
+                    if (room.id == roomId) {
+                        room.copy(devices = room.devices + device)
+                    } else room
+                })
             }
         }
     }

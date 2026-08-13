@@ -36,6 +36,12 @@ class HomeViewModel(private val repository: HomeRepository = MockHomeRepository(
         }
     }
 
+    fun toggleMultiSwitch(deviceId: String, switchId: String, isOn: Boolean) {
+        viewModelScope.launch {
+            repository.toggleMultiSwitch(deviceId, switchId, isOn)
+        }
+    }
+
     fun addFloor(name: String, level: Int) {
         viewModelScope.launch {
             repository.addFloor(name, level)
@@ -45,6 +51,12 @@ class HomeViewModel(private val repository: HomeRepository = MockHomeRepository(
     fun addRoom(floorId: String, name: String, x: Int, y: Int, width: Int, height: Int) {
         viewModelScope.launch {
             repository.addRoom(floorId, name, x, y, width, height)
+        }
+    }
+
+    fun addDeviceToRoom(roomId: String, device: Device) {
+        viewModelScope.launch {
+            repository.addDeviceToRoom(roomId, device)
         }
     }
 }
