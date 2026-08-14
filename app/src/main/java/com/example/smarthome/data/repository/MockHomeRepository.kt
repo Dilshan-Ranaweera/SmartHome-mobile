@@ -40,6 +40,14 @@ class MockHomeRepository : HomeRepository {
                 )
             )
         ))
+
+        private val _usageReports = MutableStateFlow(listOf(
+            UsageReport("1", "Main AC Outlet", "Outlet", 120, 2250.0, System.currentTimeMillis() - 86400000),
+            UsageReport("2", "Living Room Light", "Light", 240, 120.0, System.currentTimeMillis() - 86400000),
+            UsageReport("3", "Clothing Iron", "SafetyDevice", 15, 450.0, System.currentTimeMillis() - 43200000),
+            UsageReport("4", "Kitchen Lights", "MultiSwitch", 180, 180.0, System.currentTimeMillis() - 3600000),
+            UsageReport("5", "Main AC Outlet", "Outlet", 60, 750.0, System.currentTimeMillis() - 1800000)
+        ))
     }
 
     override fun getFloorPlans(): Flow<List<FloorPlan>> = _floorPlans.asStateFlow()
@@ -47,6 +55,8 @@ class MockHomeRepository : HomeRepository {
     override fun getDevices(): Flow<List<Device>> = _floorPlans.map { floors ->
         floors.flatMap { it.rooms }.flatMap { it.devices }
     }
+
+    override fun getUsageReports(): Flow<List<UsageReport>> = _usageReports.asStateFlow()
 
     override suspend fun toggleDevice(deviceId: String, isOn: Boolean) {
         _floorPlans.update { floors ->

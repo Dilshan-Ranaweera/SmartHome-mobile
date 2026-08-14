@@ -80,3 +80,13 @@ data class FloorPlan(
     val level: Int = 0,
     val rooms: List<Room>
 )
+
+@Serializable
+data class UsageReport(
+    val id: String,
+    val deviceName: String,
+    val deviceType: String,
+    val durationMinutes: Int,
+    val powerConsumedWh: Double,
+    val timestamp: Long
+)

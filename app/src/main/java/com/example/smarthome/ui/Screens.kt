@@ -1,5 +1,6 @@
 package com.example.smarthome.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
@@ -9,6 +10,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.Devices
+import androidx.compose.material.icons.filled.ElectricBolt
+import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -584,8 +589,195 @@ fun DeviceDetailScreen(deviceId: String, viewModel: HomeViewModel) {
 
 @Composable
 fun ReportsScreen(viewModel: HomeViewModel) {
-    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Text(text = "Usage Reports & Analytics")
+    val reports by viewModel.usageReports.collectAsState()
+
+    val totalEnergy = reports.sumOf { it.powerConsumedWh } / 1000.0
+    val totalTimeMinutes = reports.sumOf { it.durationMinutes }
+    val devicesUsed = reports.map { it.deviceName }.distinct().size
+    val safetyEvents = reports.count { it.deviceType == "SafetyDevice" }
+
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(24.dp)
+    ) {
+        item {
+            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+                Text(text = "Usage Reports", style = MaterialTheme.typography.headlineMedium)
+                Text(text = "Analytics & Energy Consumption", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.outline)
+                HorizontalDivider(modifier = Modifier.padding(top = 16.dp))
+            }
+        }
+
+        // Summary Grid
+        item {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    SummaryCard(title = "Energy Used", value = "%.2f kWh".format(totalEnergy), icon = Icons.Default.Bolt, modifier = Modifier.weight(1f), containerColor = MaterialTheme.colorScheme.primaryContainer)
+                    SummaryCard(title = "Total Time", value = "${totalTimeMinutes / 60}h ${totalTimeMinutes % 60}m", icon = Icons.Default.Schedule, modifier = Modifier.weight(1f), containerColor = MaterialTheme.colorScheme.secondaryContainer)
+                }
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    SummaryCard(title = "Devices Used", value = "$devicesUsed", icon = Icons.Default.Devices, modifier = Modifier.weight(1f), containerColor = MaterialTheme.colorScheme.tertiaryContainer)
+                    SummaryCard(title = "Safety Events", value = "$safetyEvents", icon = Icons.Default.Shield, modifier = Modifier.weight(1f), containerColor = MaterialTheme.colorScheme.errorContainer)
+                }
+            }
+        }
+
+        // Usage Overview Chart
+        item {
+            Column {
+                Text(text = "Usage Overview", style = MaterialTheme.typography.titleLarge)
+                Text(text = "Energy Consumption", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.outline)
+                Spacer(modifier = Modifier.height(16.dp))
+                UsageBarChart()
+            }
+        }
+
+        // Top Consumers
+        item {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(text = "Top Energy Consumers", style = MaterialTheme.typography.titleLarge)
+                
+                val topConsumers = reports.groupBy { it.deviceName }
+                    .mapValues { entry -> entry.value.sumOf { it.powerConsumedWh } / 1000.0 }
+                    .toList()
+                    .sortedByDescending { it.second }
+                    .take(4)
+
+                val maxEnergy = topConsumers.firstOrNull()?.second ?: 1.0
+
+                topConsumers.forEach { (name, energy) ->
+                    EnergyConsumerItem(name, energy, energy / maxEnergy)
+                }
+            }
+        }
+
+        // Safety & Automation
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
+            ) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(text = "Safety & Automation", style = MaterialTheme.typography.titleMedium)
+                    SafetyStatRow("Automatic Shutoffs", "1")
+                    SafetyStatRow("Scheduled Activations", "6")
+                    SafetyStatRow("Safety Alerts", "1")
+                }
+            }
+        }
+
+        // Recent Activity
+        item {
+            Text(text = "Recent Activity", style = MaterialTheme.typography.titleLarge)
+        }
+
+        items(reports.sortedByDescending { it.timestamp }) { report ->
+            UsageReportItem(report)
+        }
+    }
+}
+
+@Composable
+fun UsageBarChart() {
+    val data = listOf(0.4f, 0.7f, 0.5f, 0.9f, 0.3f)
+    val days = listOf("Mon", "Tue", "Wed", "Thu", "Fri")
+    
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(150.dp)
+            .padding(horizontal = 8.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.Bottom
+    ) {
+        data.forEachIndexed { index, value ->
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Box(
+                    modifier = Modifier
+                        .width(30.dp)
+                        .fillMaxHeight(value)
+                        .background(MaterialTheme.colorScheme.primary, MaterialTheme.shapes.small)
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(text = days[index], style = MaterialTheme.typography.labelSmall)
+            }
+        }
+    }
+}
+
+@Composable
+fun EnergyConsumerItem(name: String, energy: Double, progress: Double) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(text = name, style = MaterialTheme.typography.bodyMedium)
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                text = "%.2f kWh".format(energy),
+                style = MaterialTheme.typography.labelSmall,
+                modifier = Modifier.width(60.dp)
+            )
+            LinearProgressIndicator(
+                progress = { progress.toFloat() },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(8.dp)
+                    .background(MaterialTheme.colorScheme.outlineVariant, MaterialTheme.shapes.extraLarge),
+                strokeCap = androidx.compose.ui.graphics.StrokeCap.Round
+            )
+        }
+    }
+}
+
+@Composable
+fun SafetyStatRow(label: String, value: String) {
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+        Text(text = label, style = MaterialTheme.typography.bodyMedium)
+        Text(text = value, style = MaterialTheme.typography.bodyMedium, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
+    }
+}
+
+@Composable
+fun SummaryCard(
+    title: String,
+    value: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    modifier: Modifier = Modifier,
+    containerColor: androidx.compose.ui.graphics.Color
+) {
+    Card(
+        modifier = modifier,
+        colors = CardDefaults.cardColors(containerColor = containerColor)
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Icon(icon, contentDescription = null, modifier = Modifier.size(20.dp))
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(text = title, style = MaterialTheme.typography.labelSmall)
+            Text(text = value, style = MaterialTheme.typography.titleMedium)
+        }
+    }
+}
+
+@Composable
+fun UsageReportItem(report: com.example.smarthome.domain.UsageReport) {
+    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+        Text(text = report.deviceName, style = MaterialTheme.typography.titleSmall)
+        Text(
+            text = if (report.deviceType == "SafetyDevice") "Automatically turned OFF" else "Turned ON",
+            style = MaterialTheme.typography.bodySmall,
+            color = if (report.deviceType == "SafetyDevice") MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+        )
+        Text(
+            text = "${report.durationMinutes} min · ${report.powerConsumedWh.toInt()} Wh",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.outline
+        )
+        Text(
+            text = if (System.currentTimeMillis() - report.timestamp < 3600000) "Just now" else "Yesterday",
+            style = MaterialTheme.typography.labelSmall,
+            modifier = Modifier.padding(top = 2.dp)
+        )
+        HorizontalDivider(modifier = Modifier.padding(top = 8.dp), thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
     }
 }
 
