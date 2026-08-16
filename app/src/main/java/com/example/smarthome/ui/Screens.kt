@@ -580,10 +580,226 @@ fun DeviceItem(device: Device, onToggle: (Boolean) -> Unit, onMultiToggle: (Stri
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DeviceDetailScreen(deviceId: String, viewModel: HomeViewModel) {
-    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Text(text = "Device Control: $deviceId")
+fun DeviceDetailScreen(deviceId: String, viewModel: HomeViewModel, onBack: () -> Unit) {
+    val devices by viewModel.devices.collectAsState()
+    val device = devices.find { it.id == deviceId }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text(device?.name ?: "Device Control") },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    }
+                }
+            )
+        }
+    ) { innerPadding ->
+        if (device == null) {
+            Box(modifier = Modifier.padding(innerPadding).fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text("Device not found")
+            }
+        } else {
+            Column(
+                modifier = Modifier
+                    .padding(innerPadding)
+                    .fillMaxSize()
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(24.dp)
+            ) {
+                // Status Card
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = if (device.status == DeviceStatus.ON) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant
+                    )
+                ) {
+                    Row(
+                        modifier = Modifier.padding(24.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column {
+                            Text("Current Status", style = MaterialTheme.typography.labelLarge)
+                            Text(
+                                device.status.name,
+                                style = MaterialTheme.typography.headlineMedium,
+                                color = if (device.status == DeviceStatus.ON) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        if (device !is Device.SecurityCamera) {
+                            Switch(
+                                checked = device.status == DeviceStatus.ON,
+                                onCheckedChange = { viewModel.toggleDevice(device.id, it) }
+                            )
+                        }
+                    }
+                }
+
+                // Type-specific Controls
+                when (device) {
+                    is Device.Light -> LightDetailControls(device, viewModel)
+                    is Device.SafetyDevice -> SafetyDetailControls(device, viewModel)
+                    is Device.SecurityCamera -> CameraDetailControls(device)
+                    is Device.MultiSwitch -> MultiSwitchDetailControls(device, viewModel)
+                    is Device.Outlet -> OutletDetailControls(device)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun LightDetailControls(device: Device.Light, viewModel: HomeViewModel) {
+    var startTime by remember(device.id) { mutableStateOf(device.scheduleStart ?: "18:00") }
+    var endTime by remember(device.id) { mutableStateOf(device.scheduleEnd ?: "06:00") }
+
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Text("Automation Schedule", style = MaterialTheme.typography.titleLarge)
+        Text("The light will automatically turn ON during this time window.", style = MaterialTheme.typography.bodyMedium)
+
+        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            OutlinedTextField(
+                value = startTime,
+                onValueChange = { startTime = it },
+                label = { Text("Start Time") },
+                modifier = Modifier.weight(1f),
+                placeholder = { Text("HH:mm") }
+            )
+            OutlinedTextField(
+                value = endTime,
+                onValueChange = { endTime = it },
+                label = { Text("End Time") },
+                modifier = Modifier.weight(1f),
+                placeholder = { Text("HH:mm") }
+            )
+        }
+
+        Button(
+            onClick = { viewModel.updateLightSchedule(device.id, startTime, endTime) },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Update Schedule")
+        }
+    }
+}
+
+@Composable
+fun SafetyDetailControls(device: Device.SafetyDevice, viewModel: HomeViewModel) {
+    var maxMinutes by remember(device.id) { mutableIntStateOf(device.maxOnDurationMinutes) }
+
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Text("Safety Configuration", style = MaterialTheme.typography.titleLarge)
+        
+        if (device.status == DeviceStatus.ON && device.lastTurnedOnAt != null) {
+            val elapsed = ((System.currentTimeMillis() - device.lastTurnedOnAt) / 60000).toInt()
+            val remaining = (device.maxOnDurationMinutes - elapsed).coerceAtLeast(0)
+            
+            Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)) {
+                Column(modifier = Modifier.padding(16.dp).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("Time Until Auto-Off", style = MaterialTheme.typography.labelLarge)
+                    Text("$remaining minutes", style = MaterialTheme.typography.displayMedium)
+                    LinearProgressIndicator(
+                        progress = { (elapsed.toFloat() / device.maxOnDurationMinutes).coerceIn(0f, 1f) },
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+            }
+        }
+
+        Text("Max ON Duration: $maxMinutes minutes", style = MaterialTheme.typography.titleMedium)
+        Slider(
+            value = maxMinutes.toFloat(),
+            onValueChange = { maxMinutes = it.toInt() },
+            valueRange = 5f..60f,
+            steps = 10
+        )
+
+        Button(
+            onClick = { viewModel.updateSafetyDuration(device.id, maxMinutes) },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Save Safety Limit")
+        }
+    }
+}
+
+@Composable
+fun CameraDetailControls(device: Device.SecurityCamera) {
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Text("Live Stream", style = MaterialTheme.typography.titleLarge)
+        
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(240.dp)
+                .background(androidx.compose.ui.graphics.Color.Black, MaterialTheme.shapes.medium),
+            contentAlignment = Alignment.Center
+        ) {
+            if (device.status != DeviceStatus.DISCONNECTED) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(Icons.Default.Videocam, contentDescription = null, tint = androidx.compose.ui.graphics.Color.White, modifier = Modifier.size(48.dp))
+                    Text("LIVE FEED ACTIVE", color = androidx.compose.ui.graphics.Color.White)
+                    Text(device.streamUri ?: "No URI", color = androidx.compose.ui.graphics.Color.Gray, style = MaterialTheme.typography.labelSmall)
+                }
+            } else {
+                Text("CAMERA DISCONNECTED", color = MaterialTheme.colorScheme.error)
+            }
+        }
+        
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            AssistChip(onClick = {}, label = { Text("Record") }, leadingIcon = { Icon(Icons.Default.RadioButtonChecked, null) })
+            AssistChip(onClick = {}, label = { Text("Snapshot") }, leadingIcon = { Icon(Icons.Default.PhotoCamera, null) })
+            AssistChip(onClick = {}, label = { Text("Talk") }, leadingIcon = { Icon(Icons.Default.Mic, null) })
+        }
+    }
+}
+
+@Composable
+fun MultiSwitchDetailControls(device: Device.MultiSwitch, viewModel: HomeViewModel) {
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Text("Individual Switch Control", style = MaterialTheme.typography.titleLarge)
+        
+        device.switches.forEach { sw ->
+            OutlinedCard(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.outlinedCardColors(
+                    containerColor = if (sw.isOn) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f) else MaterialTheme.colorScheme.surface
+                )
+            ) {
+                Row(
+                    modifier = Modifier.padding(16.dp).fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(sw.name, style = MaterialTheme.typography.titleMedium)
+                    Switch(
+                        checked = sw.isOn,
+                        onCheckedChange = { viewModel.toggleMultiSwitch(device.id, sw.id, it) }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun OutletDetailControls(device: Device.Outlet) {
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Text("Energy Usage History", style = MaterialTheme.typography.titleLarge)
+        Text("This outlet is currently monitoring real-time power consumption.", style = MaterialTheme.typography.bodyMedium)
+        
+        // Placeholder for a small chart or graph
+        Box(
+            modifier = Modifier.fillMaxWidth().height(120.dp).background(MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.shapes.medium),
+            contentAlignment = Alignment.Center
+        ) {
+            Text("Power Graph Placeholder", color = MaterialTheme.colorScheme.outline)
+        }
     }
 }
 

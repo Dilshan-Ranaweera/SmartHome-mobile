@@ -65,7 +65,11 @@ fun SmartHomeNavHost(
         }
         composable<DeviceDetailRoute> { backStackEntry ->
             val route: DeviceDetailRoute = backStackEntry.toRoute()
-            DeviceDetailScreen(route.deviceId, homeViewModel)
+            DeviceDetailScreen(
+                deviceId = route.deviceId,
+                viewModel = homeViewModel,
+                onBack = { navController.popBackStack() }
+            )
         }
         composable<ReportsRoute> {
             ReportsScreen(homeViewModel)
