@@ -1,21 +1,24 @@
 package com.example.smarthome.viewmodel
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.smarthome.data.repository.HomeRepository
 import com.example.smarthome.data.repository.FirebaseHomeRepository
+import com.example.smarthome.data.repository.HomeRepository
 import com.example.smarthome.domain.Device
 import com.example.smarthome.domain.FloorPlan
 import com.example.smarthome.domain.UsageReport
+import com.example.smarthome.util.NotificationHelper
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.delay
 import java.util.Calendar
-class HomeViewModel(private val repository: HomeRepository = FirebaseHomeRepository()) : ViewModel() {
 
+class HomeViewModel(application: Application) : AndroidViewModel(application) {
+    private val repository: HomeRepository = FirebaseHomeRepository()
 
     val floorPlans: StateFlow<List<FloorPlan>> = repository.getFloorPlans()
         .map { floors -> floors.sortedByDescending { it.level } }
@@ -104,6 +107,11 @@ class HomeViewModel(private val repository: HomeRepository = FirebaseHomeReposit
                         val onDurationMillis = currentTime - device.lastTurnedOnAt
                         if (onDurationMillis > device.maxOnDurationMinutes * 60 * 1000L) {
                             toggleDevice(device.id, false)
+                            NotificationHelper.showSafetyNotification(
+                                getApplication(),
+                                "Safety Alert",
+                                "${device.name} turned OFF automatically (Time Limit Exceeded)"
+                            )
                         }
                     }
                 }
@@ -123,8 +131,18 @@ class HomeViewModel(private val repository: HomeRepository = FirebaseHomeReposit
                             
                             if (isWithinSchedule && device.status == com.example.smarthome.domain.DeviceStatus.OFF) {
                                 toggleDevice(device.id, true)
+                                NotificationHelper.showSafetyNotification(
+                                    getApplication(),
+                                    "Light Automated",
+                                    "${device.name} turned ON based on schedule"
+                                )
                             } else if (!isWithinSchedule && device.status == com.example.smarthome.domain.DeviceStatus.ON) {
                                 toggleDevice(device.id, false)
+                                NotificationHelper.showSafetyNotification(
+                                    getApplication(),
+                                    "Light Automated",
+                                    "${device.name} turned OFF based on schedule"
+                                )
                             }
                         }
                     }

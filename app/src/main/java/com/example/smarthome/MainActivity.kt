@@ -30,10 +30,36 @@ import com.example.smarthome.navigation.SchedulesRoute
 import com.example.smarthome.navigation.CamerasRoute
 import com.example.smarthome.navigation.SmartHomeNavHost
 import com.example.smarthome.ui.theme.SmartHomeTheme
+import com.example.smarthome.util.NotificationHelper
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 
 class MainActivity : ComponentActivity() {
+    private val requestPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { _ -> }
+
+    private fun checkNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(
+                    this,
+                    Manifest.permission.POST_NOTIFICATIONS
+                ) != PackageManager.PERMISSION_GRANTED
+            ) {
+                requestPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            }
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        NotificationHelper.createNotificationChannel(this)
+        checkNotificationPermission()
+
         enableEdgeToEdge()
         setContent {
             SmartHomeTheme {
