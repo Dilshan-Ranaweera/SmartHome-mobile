@@ -104,6 +104,34 @@ class MockHomeRepository : HomeRepository {
         }
     }
 
+    override suspend fun updateLightSchedule(deviceId: String, start: String, end: String) {
+        _floorPlans.update { floors ->
+            floors.map { floor ->
+                floor.copy(rooms = floor.rooms.map { room ->
+                    room.copy(devices = room.devices.map { device ->
+                        if (device.id == deviceId && device is Device.Light) {
+                            device.copy(scheduleStart = start, scheduleEnd = end)
+                        } else device
+                    })
+                })
+            }
+        }
+    }
+
+    override suspend fun updateSafetyDuration(deviceId: String, maxMinutes: Int) {
+        _floorPlans.update { floors ->
+            floors.map { floor ->
+                floor.copy(rooms = floor.rooms.map { room ->
+                    room.copy(devices = room.devices.map { device ->
+                        if (device.id == deviceId && device is Device.SafetyDevice) {
+                            device.copy(maxOnDurationMinutes = maxMinutes)
+                        } else device
+                    })
+                })
+            }
+        }
+    }
+
     override suspend fun addFloor(name: String, level: Int) {
         _floorPlans.update { currentFloors ->
             currentFloors + FloorPlan(

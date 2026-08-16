@@ -781,17 +781,428 @@ fun UsageReportItem(report: com.example.smarthome.domain.UsageReport) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SchedulesScreen(viewModel: HomeViewModel) {
-    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Text(text = "Schedules & Safety Cutoffs")
+    val devices by viewModel.devices.collectAsState()
+    val lights = devices.filterIsInstance<Device.Light>()
+    val safetyDevices = devices.filterIsInstance<Device.SafetyDevice>()
+
+    var editingLight by remember { mutableStateOf<Device.Light?>(null) }
+    var editingSafety by remember { mutableStateOf<Device.SafetyDevice?>(null) }
+
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        // Header
+        item {
+            Column {
+                Text(text = "Schedules & Safety", style = MaterialTheme.typography.headlineMedium)
+                Text(
+                    text = "Manage light automation and safety cutoffs",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.outline
+                )
+                HorizontalDivider(modifier = Modifier.padding(top = 16.dp))
+            }
+        }
+
+        // Light Schedules Section
+        item {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.Lightbulb, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(text = "Light Schedules", style = MaterialTheme.typography.titleLarge)
+            }
+        }
+
+        if (lights.isEmpty()) {
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                ) {
+                    Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
+                        Text("No lights added yet. Add lights to rooms to set schedules.",
+                            style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.outline)
+                    }
+                }
+            }
+        } else {
+            items(lights) { light ->
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = if (light.status == DeviceStatus.ON)
+                            MaterialTheme.colorScheme.primaryContainer
+                        else MaterialTheme.colorScheme.surfaceVariant
+                    ),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    Icons.Default.Lightbulb,
+                                    contentDescription = null,
+                                    tint = if (light.status == DeviceStatus.ON) MaterialTheme.colorScheme.primary else LocalContentColor.current,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Column {
+                                    Text(text = light.name, style = MaterialTheme.typography.titleMedium)
+                                    Text(
+                                        text = light.status.name,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = if (light.status == DeviceStatus.ON) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
+                                    )
+                                }
+                            }
+                            Switch(
+                                checked = light.status == DeviceStatus.ON,
+                                onCheckedChange = { viewModel.toggleDevice(light.id, it) }
+                            )
+                        }
+
+                        HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column {
+                                Text(text = "Schedule", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.outline)
+                                if (!light.scheduleStart.isNullOrEmpty() && !light.scheduleEnd.isNullOrEmpty()) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(Icons.Default.Schedule, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text(
+                                            text = "${light.scheduleStart} → ${light.scheduleEnd}",
+                                            style = MaterialTheme.typography.bodyLarge,
+                                            fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold
+                                        )
+                                    }
+                                } else {
+                                    Text(text = "No schedule set", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.outline)
+                                }
+                            }
+                            FilledTonalButton(onClick = { editingLight = light }) {
+                                Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Edit")
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Safety Auto-Shutoffs Section
+        item {
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.Shield, contentDescription = null, tint = MaterialTheme.colorScheme.error)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(text = "Safety Auto-Shutoffs", style = MaterialTheme.typography.titleLarge)
+            }
+        }
+
+        if (safetyDevices.isEmpty()) {
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                ) {
+                    Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
+                        Text("No safety devices added yet.",
+                            style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.outline)
+                    }
+                }
+            }
+        } else {
+            items(safetyDevices) { safety ->
+                val isOn = safety.status == DeviceStatus.ON
+                val elapsedMinutes = if (isOn && safety.lastTurnedOnAt != null) {
+                    ((System.currentTimeMillis() - safety.lastTurnedOnAt) / 60000).toInt()
+                } else 0
+                val remaining = safety.maxOnDurationMinutes - elapsedMinutes
+                val progress = if (safety.maxOnDurationMinutes > 0 && isOn) {
+                    (elapsedMinutes.toFloat() / safety.maxOnDurationMinutes).coerceIn(0f, 1f)
+                } else 0f
+
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = if (isOn) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.surfaceVariant
+                    ),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    Icons.Default.Iron,
+                                    contentDescription = null,
+                                    tint = if (isOn) MaterialTheme.colorScheme.error else LocalContentColor.current,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Column {
+                                    Text(text = safety.name, style = MaterialTheme.typography.titleMedium)
+                                    Text(
+                                        text = if (isOn) "ON — Auto-off in ${remaining.coerceAtLeast(0)} min" else "OFF",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = if (isOn) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.outline
+                                    )
+                                }
+                            }
+                            Switch(
+                                checked = isOn,
+                                onCheckedChange = { viewModel.toggleDevice(safety.id, it) }
+                            )
+                        }
+
+                        if (isOn) {
+                            Spacer(modifier = Modifier.height(12.dp))
+                            LinearProgressIndicator(
+                                progress = { progress },
+                                modifier = Modifier.fillMaxWidth().height(6.dp),
+                                color = MaterialTheme.colorScheme.error,
+                                trackColor = MaterialTheme.colorScheme.error.copy(alpha = 0.2f),
+                                strokeCap = androidx.compose.ui.graphics.StrokeCap.Round
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text(text = "$elapsedMinutes min elapsed", style = MaterialTheme.typography.labelSmall)
+                                Text(text = "${safety.maxOnDurationMinutes} min max", style = MaterialTheme.typography.labelSmall)
+                            }
+                        }
+
+                        HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column {
+                                Text(text = "Max ON Duration", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.outline)
+                                Text(
+                                    text = "${safety.maxOnDurationMinutes} minutes",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold
+                                )
+                            }
+                            FilledTonalButton(onClick = { editingSafety = safety }) {
+                                Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Edit")
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Edit Light Schedule Dialog
+    if (editingLight != null) {
+        val light = editingLight!!
+        var start by remember(light.id) { mutableStateOf(light.scheduleStart ?: "18:00") }
+        var end by remember(light.id) { mutableStateOf(light.scheduleEnd ?: "06:00") }
+
+        AlertDialog(
+            onDismissRequest = { editingLight = null },
+            icon = { Icon(Icons.Default.Schedule, contentDescription = null) },
+            title = { Text("Edit Schedule: ${light.name}") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("Set the time window when this light should automatically turn ON.", style = MaterialTheme.typography.bodyMedium)
+                    OutlinedTextField(
+                        value = start,
+                        onValueChange = { start = it },
+                        label = { Text("Start Time (HH:mm)") },
+                        modifier = Modifier.fillMaxWidth(),
+                        placeholder = { Text("e.g. 18:00") }
+                    )
+                    OutlinedTextField(
+                        value = end,
+                        onValueChange = { end = it },
+                        label = { Text("End Time (HH:mm)") },
+                        modifier = Modifier.fillMaxWidth(),
+                        placeholder = { Text("e.g. 06:00") }
+                    )
+                }
+            },
+            confirmButton = {
+                Button(onClick = {
+                    viewModel.updateLightSchedule(light.id, start, end)
+                    editingLight = null
+                }) { Text("Save") }
+            },
+            dismissButton = {
+                TextButton(onClick = { editingLight = null }) { Text("Cancel") }
+            }
+        )
+    }
+
+    // Edit Safety Duration Dialog
+    if (editingSafety != null) {
+        val safety = editingSafety!!
+        var maxMin by remember(safety.id) { mutableIntStateOf(safety.maxOnDurationMinutes) }
+
+        AlertDialog(
+            onDismissRequest = { editingSafety = null },
+            icon = { Icon(Icons.Default.Shield, contentDescription = null) },
+            title = { Text("Edit Safety: ${safety.name}") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("Set the maximum duration this device can stay ON before automatic shutoff.", style = MaterialTheme.typography.bodyMedium)
+                    Text("Max Duration: $maxMin minutes", style = MaterialTheme.typography.titleMedium)
+                    Slider(
+                        value = maxMin.toFloat(),
+                        onValueChange = { maxMin = it.toInt() },
+                        valueRange = 1f..120f,
+                        steps = 23
+                    )
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("1 min", style = MaterialTheme.typography.labelSmall)
+                        Text("120 min", style = MaterialTheme.typography.labelSmall)
+                    }
+                }
+            },
+            confirmButton = {
+                Button(onClick = {
+                    viewModel.updateSafetyDuration(safety.id, maxMin)
+                    editingSafety = null
+                }) { Text("Save") }
+            },
+            dismissButton = {
+                TextButton(onClick = { editingSafety = null }) { Text("Cancel") }
+            }
+        )
     }
 }
 
 @Composable
 fun CamerasScreen(viewModel: HomeViewModel) {
-    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Text(text = "Security Camera Monitoring")
+    val devices by viewModel.devices.collectAsState()
+    val cameras = devices.filterIsInstance<Device.SecurityCamera>()
+
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        item {
+            Column {
+                Text(text = "Security Cameras", style = MaterialTheme.typography.headlineMedium)
+                Text(
+                    text = "Monitor your camera feeds",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.outline
+                )
+                HorizontalDivider(modifier = Modifier.padding(top = 16.dp))
+            }
+        }
+
+        if (cameras.isEmpty()) {
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                ) {
+                    Box(modifier = Modifier.fillMaxWidth().padding(48.dp), contentAlignment = Alignment.Center) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(Icons.Default.Videocam, contentDescription = null, modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.outline)
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text("No cameras added yet.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.outline)
+                        }
+                    }
+                }
+            }
+        } else {
+            items(cameras) { camera ->
+                val isConnected = camera.status != DeviceStatus.DISCONNECTED && camera.status != DeviceStatus.ERROR
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = if (isConnected) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f)
+                    ),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        // Camera feed placeholder
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(160.dp)
+                                .background(
+                                    MaterialTheme.colorScheme.inverseSurface.copy(alpha = 0.85f),
+                                    MaterialTheme.shapes.medium
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (isConnected) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Icon(Icons.Default.Videocam, contentDescription = null, modifier = Modifier.size(40.dp), tint = MaterialTheme.colorScheme.inverseOnSurface)
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Text("Live Feed", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.inverseOnSurface)
+                                }
+                            } else {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Icon(Icons.Default.VideocamOff, contentDescription = null, modifier = Modifier.size(40.dp), tint = MaterialTheme.colorScheme.error)
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Text("Disconnected", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.error)
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column {
+                                Text(text = camera.name, style = MaterialTheme.typography.titleMedium)
+                                if (!camera.streamUri.isNullOrEmpty()) {
+                                    Text(
+                                        text = camera.streamUri,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.outline,
+                                        maxLines = 1
+                                    )
+                                }
+                            }
+                            Badge(
+                                containerColor = if (isConnected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.errorContainer
+                            ) {
+                                Text(
+                                    text = if (isConnected) "CONNECTED" else camera.status.name,
+                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
+                                    style = MaterialTheme.typography.labelSmall
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
