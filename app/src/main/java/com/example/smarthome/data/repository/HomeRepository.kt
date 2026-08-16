@@ -16,4 +16,5 @@ interface HomeRepository {
     suspend fun addDeviceToRoom(roomId: String, device: Device)
     suspend fun updateLightSchedule(deviceId: String, start: String, end: String)
     suspend fun updateSafetyDuration(deviceId: String, maxMinutes: Int)
+    suspend fun addUsageReport(report: UsageReport)
 }

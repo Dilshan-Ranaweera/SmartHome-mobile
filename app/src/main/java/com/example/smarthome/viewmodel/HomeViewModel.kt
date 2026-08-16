@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.util.Calendar
+import java.util.UUID
 
 class HomeViewModel(application: Application) : AndroidViewModel(application) {
     private val repository: HomeRepository = FirebaseHomeRepository()
@@ -45,7 +46,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     init {
         viewModelScope.launch {
             while (true) {
-                enforceDevicePolicies()
+                enforceDevicePoliciesAndSimulateUsage()
                 delay(60_000)
             }
         }
@@ -93,7 +94,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    private fun enforceDevicePolicies() {
+    private fun enforceDevicePoliciesAndSimulateUsage() {
         val currentTime = System.currentTimeMillis()
         val calendar = Calendar.getInstance()
         val currentHour = calendar.get(Calendar.HOUR_OF_DAY)
@@ -101,6 +102,12 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         val currentTimeInMinutes = currentHour * 60 + currentMinute
         
         devices.value.forEach { device ->
+            // --- Usage Simulation ---
+            if (device.status == com.example.smarthome.domain.DeviceStatus.ON) {
+                simulateConsumption(device)
+            }
+
+            // --- Policy Enforcement ---
             when (device) {
                 is Device.SafetyDevice -> {
                     if (device.status == com.example.smarthome.domain.DeviceStatus.ON && device.lastTurnedOnAt != null) {
@@ -112,6 +119,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                                 "Safety Alert",
                                 "${device.name} turned OFF automatically (Time Limit Exceeded)"
                             )
+                            // Record a safety event in reports
+                            recordUsageEvent(device, (onDurationMillis / 60000).toInt(), true)
                         }
                     }
                 }
@@ -143,12 +152,42 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                                     "Light Automated",
                                     "${device.name} turned OFF based on schedule"
                                 )
+                                recordUsageEvent(device, 1, false)
                             }
                         }
                     }
                 }
                 else -> {}
             }
+        }
+    }
+
+    private fun simulateConsumption(device: Device) {
+        viewModelScope.launch {
+            val hourlyWh = when(device) {
+                is Device.Outlet -> 1500.0 // Heavy load
+                is Device.Light -> 15.0    // LED
+                is Device.SafetyDevice -> 2000.0 // Iron
+                is Device.MultiSwitch -> 60.0
+                is Device.SecurityCamera -> 10.0
+            }
+            // Minute consumption
+            val minuteWh = hourlyWh / 60.0
+            
+            repository.addUsageReport(UsageReport(
+                id = UUID.randomUUID().toString(),
+                deviceName = device.name,
+                deviceType = device::class.simpleName ?: "Unknown",
+                durationMinutes = 1,
+                powerConsumedWh = minuteWh,
+                timestamp = System.currentTimeMillis()
+            ))
+        }
+    }
+
+    private fun recordUsageEvent(device: Device, duration: Int, isSafety: Boolean) {
+        viewModelScope.launch {
+             // Logic to record larger chunks of data when turned off
         }
     }
 
