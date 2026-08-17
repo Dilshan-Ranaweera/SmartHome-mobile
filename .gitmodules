@@ -1,0 +1,3 @@
+[submodule "smart-home-hardware-simulator"]
+	path = smart-home-hardware-simulator
+	url = https://github.com/Dilshan522/smart-home-hardware-simulator.git
