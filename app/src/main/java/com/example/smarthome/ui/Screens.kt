@@ -21,6 +21,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.viewinterop.AndroidView
+import android.net.Uri
+import android.widget.VideoView
 import com.example.smarthome.domain.Device
 import com.example.smarthome.domain.DeviceStatus
 import com.example.smarthome.domain.FloorPlan
@@ -505,7 +509,7 @@ fun AddDeviceBottomSheet(onDismiss: () -> Unit, onConfirm: (Device) -> Unit) {
                         "Multi-Switch" -> Device.MultiSwitch(id, deviceName, switches = List(switchCount) { i -> com.example.smarthome.domain.SwitchUnit("s$i", "Switch ${i + 1}", false) })
                         "Safety Iron" -> Device.SafetyDevice(id, deviceName, maxOnDurationMinutes = maxDuration)
                         "Light" -> Device.Light(id, deviceName, scheduleStart = startTime, scheduleEnd = endTime)
-                        "Camera" -> Device.SecurityCamera(id, deviceName, streamUri = "mock://stream/$deviceName")
+                        "Camera" -> Device.SecurityCamera(id, deviceName, status = DeviceStatus.ON, streamUri = "mock://stream/$deviceName")
                         else -> Device.Outlet(id, deviceName)
                     }
                     onConfirm(newDevice)
@@ -559,7 +563,7 @@ fun DeviceItem(device: Device, onToggle: (Boolean) -> Unit, onMultiToggle: (Stri
                     Icon(icon, contentDescription = null, tint = if (device.status == DeviceStatus.ON) MaterialTheme.colorScheme.primary else LocalContentColor.current)
                 },
                 trailingContent = {
-                    if (device !is Device.SecurityCamera && device !is Device.MultiSwitch) {
+                    if (device !is Device.MultiSwitch) {
                         Switch(checked = device.status == DeviceStatus.ON, onCheckedChange = onToggle)
                     }
                 },
@@ -630,12 +634,10 @@ fun DeviceDetailScreen(deviceId: String, viewModel: HomeViewModel, onBack: () ->
                                 color = if (device.status == DeviceStatus.ON) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
-                        if (device !is Device.SecurityCamera) {
-                            Switch(
-                                checked = device.status == DeviceStatus.ON,
-                                onCheckedChange = { viewModel.toggleDevice(device.id, it) }
-                            )
-                        }
+                        Switch(
+                            checked = device.status == DeviceStatus.ON,
+                            onCheckedChange = { viewModel.toggleDevice(device.id, it) }
+                        )
                     }
                 }
 
@@ -737,17 +739,28 @@ fun CameraDetailControls(device: Device.SecurityCamera) {
             modifier = Modifier
                 .fillMaxWidth()
                 .height(240.dp)
-                .background(androidx.compose.ui.graphics.Color.Black, MaterialTheme.shapes.medium),
+                .background(androidx.compose.ui.graphics.Color.Black, MaterialTheme.shapes.medium)
+                .clip(MaterialTheme.shapes.medium),
             contentAlignment = Alignment.Center
         ) {
-            if (device.status != DeviceStatus.DISCONNECTED) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(Icons.Default.Videocam, contentDescription = null, tint = androidx.compose.ui.graphics.Color.White, modifier = Modifier.size(48.dp))
-                    Text("LIVE FEED ACTIVE", color = androidx.compose.ui.graphics.Color.White)
-                    Text(device.streamUri ?: "No URI", color = androidx.compose.ui.graphics.Color.Gray, style = MaterialTheme.typography.labelSmall)
+            if (device.status == DeviceStatus.ON) {
+                LoopingVideoPlayer(modifier = Modifier.fillMaxSize())
+                
+                // Overlay text
+                Column(
+                    modifier = Modifier.fillMaxSize().padding(8.dp),
+                    verticalArrangement = Arrangement.Top,
+                    horizontalAlignment = Alignment.End
+                ) {
+                    Badge(containerColor = androidx.compose.ui.graphics.Color.Red.copy(alpha = 0.7f)) {
+                        Text("LIVE", color = androidx.compose.ui.graphics.Color.White, modifier = Modifier.padding(horizontal = 4.dp))
+                    }
                 }
             } else {
-                Text("CAMERA DISCONNECTED", color = MaterialTheme.colorScheme.error)
+                Text(
+                    if (device.status == DeviceStatus.OFF) "CAMERA IN STANDBY" else "CAMERA DISCONNECTED", 
+                    color = if (device.status == DeviceStatus.OFF) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.error
+                )
             }
         }
         
@@ -757,6 +770,29 @@ fun CameraDetailControls(device: Device.SecurityCamera) {
             AssistChip(onClick = {}, label = { Text("Talk") }, leadingIcon = { Icon(Icons.Default.Mic, null) })
         }
     }
+}
+
+@Composable
+fun LoopingVideoPlayer(modifier: Modifier = Modifier) {
+    AndroidView(
+        modifier = modifier,
+        factory = { context ->
+            VideoView(context).apply {
+                val videoId = context.resources.getIdentifier("camera_mock", "raw", context.packageName)
+                if (videoId != 0) {
+                    val uri = Uri.parse("android.resource://${context.packageName}/$videoId")
+                    setVideoURI(uri)
+                    setOnPreparedListener { mp ->
+                        mp.isLooping = true
+                        start()
+                    }
+                }
+            }
+        },
+        update = { view ->
+            if (!view.isPlaying) view.start()
+        }
+    )
 }
 
 @Composable
@@ -1352,11 +1388,12 @@ fun CamerasScreen(viewModel: HomeViewModel) {
             }
         } else {
             items(cameras) { camera ->
+                val isStreaming = camera.status == DeviceStatus.ON
                 val isConnected = camera.status != DeviceStatus.DISCONNECTED && camera.status != DeviceStatus.ERROR
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(
-                        containerColor = if (isConnected) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f)
+                        containerColor = if (isStreaming) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f)
                     ),
                     elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                 ) {
@@ -1369,20 +1406,35 @@ fun CamerasScreen(viewModel: HomeViewModel) {
                                 .background(
                                     MaterialTheme.colorScheme.inverseSurface.copy(alpha = 0.85f),
                                     MaterialTheme.shapes.medium
-                                ),
+                                )
+                                .clip(MaterialTheme.shapes.medium),
                             contentAlignment = Alignment.Center
                         ) {
-                            if (isConnected) {
-                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Icon(Icons.Default.Videocam, contentDescription = null, modifier = Modifier.size(40.dp), tint = MaterialTheme.colorScheme.inverseOnSurface)
-                                    Spacer(modifier = Modifier.height(8.dp))
-                                    Text("Live Feed", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.inverseOnSurface)
+                            if (isStreaming) {
+                                LoopingVideoPlayer(modifier = Modifier.fillMaxSize())
+                                Column(
+                                    modifier = Modifier.fillMaxSize().padding(8.dp),
+                                    verticalArrangement = Arrangement.Top,
+                                    horizontalAlignment = Alignment.End
+                                ) {
+                                    Badge(containerColor = androidx.compose.ui.graphics.Color.Red.copy(alpha = 0.7f)) {
+                                        Text("LIVE", color = androidx.compose.ui.graphics.Color.White, modifier = Modifier.padding(horizontal = 4.dp))
+                                    }
                                 }
                             } else {
                                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Icon(Icons.Default.VideocamOff, contentDescription = null, modifier = Modifier.size(40.dp), tint = MaterialTheme.colorScheme.error)
+                                    Icon(
+                                        if (isConnected) Icons.Default.VideocamOff else Icons.Default.CloudOff, 
+                                        contentDescription = null, 
+                                        modifier = Modifier.size(40.dp), 
+                                        tint = if (isConnected) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.error
+                                    )
                                     Spacer(modifier = Modifier.height(8.dp))
-                                    Text("Disconnected", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.error)
+                                    Text(
+                                        if (isConnected) "Camera Standby" else "Disconnected", 
+                                        style = MaterialTheme.typography.labelLarge, 
+                                        color = if (isConnected) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.error
+                                    )
                                 }
                             }
                         }
@@ -1394,7 +1446,7 @@ fun CamerasScreen(viewModel: HomeViewModel) {
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Column {
+                            Column(modifier = Modifier.weight(1f)) {
                                 Text(text = camera.name, style = MaterialTheme.typography.titleMedium)
                                 if (!camera.streamUri.isNullOrEmpty()) {
                                     Text(
@@ -1405,11 +1457,26 @@ fun CamerasScreen(viewModel: HomeViewModel) {
                                     )
                                 }
                             }
+                            
+                            Switch(
+                                checked = camera.status == DeviceStatus.ON,
+                                onCheckedChange = { viewModel.toggleDevice(camera.id, it) },
+                                modifier = Modifier.padding(horizontal = 8.dp)
+                            )
+
                             Badge(
-                                containerColor = if (isConnected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.errorContainer
+                                containerColor = when {
+                                    isStreaming -> MaterialTheme.colorScheme.primaryContainer
+                                    isConnected -> MaterialTheme.colorScheme.secondaryContainer
+                                    else -> MaterialTheme.colorScheme.errorContainer
+                                }
                             ) {
                                 Text(
-                                    text = if (isConnected) "CONNECTED" else camera.status.name,
+                                    text = when {
+                                        isStreaming -> "STREAMING"
+                                        isConnected -> "STANDBY"
+                                        else -> camera.status.name
+                                    },
                                     modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
                                     style = MaterialTheme.typography.labelSmall
                                 )

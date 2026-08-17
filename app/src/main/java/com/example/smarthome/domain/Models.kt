@@ -41,7 +41,7 @@ sealed class Device {
     data class SecurityCamera(
         override val id: String,
         override val name: String,
-        override val status: DeviceStatus = DeviceStatus.DISCONNECTED,
+        override val status: DeviceStatus = DeviceStatus.ON,
         val streamUri: String? = null
     ) : Device()
 
