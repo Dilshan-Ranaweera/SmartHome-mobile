@@ -113,14 +113,14 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                     if (device.status == com.example.smarthome.domain.DeviceStatus.ON && device.lastTurnedOnAt != null) {
                         val onDurationMillis = currentTime - device.lastTurnedOnAt
                         if (onDurationMillis > device.maxOnDurationMinutes * 60 * 1000L) {
-                            toggleDevice(device.id, false)
+                            viewModelScope.launch {
+                                repository.triggerSafetyCutoff(device.id)
+                            }
                             NotificationHelper.showSafetyNotification(
                                 getApplication(),
                                 "Safety Alert",
                                 "${device.name} turned OFF automatically (Time Limit Exceeded)"
                             )
-                            // Record a safety event in reports
-                            recordUsageEvent(device, (onDurationMillis / 60000).toInt(), true)
                         }
                     }
                 }
@@ -139,20 +139,23 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                             }
                             
                             if (isWithinSchedule && device.status == com.example.smarthome.domain.DeviceStatus.OFF) {
-                                toggleDevice(device.id, true)
+                                viewModelScope.launch {
+                                    repository.triggerScheduledToggle(device.id, true)
+                                }
                                 NotificationHelper.showSafetyNotification(
                                     getApplication(),
                                     "Light Automated",
                                     "${device.name} turned ON based on schedule"
                                 )
                             } else if (!isWithinSchedule && device.status == com.example.smarthome.domain.DeviceStatus.ON) {
-                                toggleDevice(device.id, false)
+                                viewModelScope.launch {
+                                    repository.triggerScheduledToggle(device.id, false)
+                                }
                                 NotificationHelper.showSafetyNotification(
                                     getApplication(),
                                     "Light Automated",
                                     "${device.name} turned OFF based on schedule"
                                 )
-                                recordUsageEvent(device, 1, false)
                             }
                         }
                     }
@@ -182,12 +185,6 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 powerConsumedWh = minuteWh,
                 timestamp = System.currentTimeMillis()
             ))
-        }
-    }
-
-    private fun recordUsageEvent(device: Device, duration: Int, isSafety: Boolean) {
-        viewModelScope.launch {
-             // Logic to record larger chunks of data when turned off
         }
     }
 

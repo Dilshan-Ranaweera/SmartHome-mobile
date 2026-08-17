@@ -34,7 +34,8 @@ sealed class Device {
         override val name: String,
         override val status: DeviceStatus = DeviceStatus.OFF,
         val maxOnDurationMinutes: Int,
-        val lastTurnedOnAt: Long? = null
+        val lastTurnedOnAt: Long? = null,
+        val lastOffReason: String? = null
     ) : Device()
 
     @Serializable
@@ -51,7 +52,8 @@ sealed class Device {
         override val name: String,
         override val status: DeviceStatus = DeviceStatus.OFF,
         val scheduleStart: String? = null,
-        val scheduleEnd: String? = null
+        val scheduleEnd: String? = null,
+        val lastOffReason: String? = null
     ) : Device()
 }
 

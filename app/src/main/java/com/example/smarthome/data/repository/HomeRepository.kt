@@ -17,4 +17,6 @@ interface HomeRepository {
     suspend fun updateLightSchedule(deviceId: String, start: String, end: String)
     suspend fun updateSafetyDuration(deviceId: String, maxMinutes: Int)
     suspend fun addUsageReport(report: UsageReport)
+    suspend fun triggerSafetyCutoff(deviceId: String)
+    suspend fun triggerScheduledToggle(deviceId: String, isOn: Boolean)
 }

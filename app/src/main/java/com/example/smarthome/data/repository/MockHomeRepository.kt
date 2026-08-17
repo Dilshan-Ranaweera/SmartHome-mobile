@@ -70,9 +70,16 @@ class MockHomeRepository : HomeRepository {
                                 is Device.MultiSwitch -> {
                                     device.copy(status = newStatus, switches = device.switches.map { it.copy(isOn = isOn) })
                                 }
-                                is Device.SafetyDevice -> device.copy(status = newStatus)
+                                is Device.SafetyDevice -> device.copy(
+                                    status = newStatus, 
+                                    lastTurnedOnAt = if (isOn) System.currentTimeMillis() else device.lastTurnedOnAt,
+                                    lastOffReason = if (isOn) null else "manual"
+                                )
                                 is Device.SecurityCamera -> device.copy(status = newStatus)
-                                is Device.Light -> device.copy(status = newStatus)
+                                is Device.Light -> device.copy(
+                                    status = newStatus,
+                                    lastOffReason = if (isOn) null else "manual"
+                                )
                             }
                         } else device
                     })
@@ -175,6 +182,37 @@ class MockHomeRepository : HomeRepository {
     override suspend fun addUsageReport(report: UsageReport) {
         _usageReports.update { current ->
             current + report
+        }
+    }
+
+    override suspend fun triggerSafetyCutoff(deviceId: String) {
+        _floorPlans.update { floors ->
+            floors.map { floor ->
+                floor.copy(rooms = floor.rooms.map { room ->
+                    room.copy(devices = room.devices.map { device ->
+                        if (device.id == deviceId && device is Device.SafetyDevice) {
+                            device.copy(status = DeviceStatus.OFF, lastOffReason = "safety_cutoff")
+                        } else device
+                    })
+                })
+            }
+        }
+    }
+
+    override suspend fun triggerScheduledToggle(deviceId: String, isOn: Boolean) {
+        _floorPlans.update { floors ->
+            floors.map { floor ->
+                floor.copy(rooms = floor.rooms.map { room ->
+                    room.copy(devices = room.devices.map { device ->
+                        if (device.id == deviceId && device is Device.Light) {
+                            device.copy(
+                                status = if (isOn) DeviceStatus.ON else DeviceStatus.OFF,
+                                lastOffReason = if (isOn) "scheduled_on" else "scheduled_cutoff"
+                            )
+                        } else device
+                    })
+                })
+            }
         }
     }
 }
